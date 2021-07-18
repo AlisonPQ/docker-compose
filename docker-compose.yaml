@@ -1,0 +1,78 @@
+version: '3'
+networks:
+  final-project-network:
+    driver: bridge
+
+volumes:
+  jenkins-home:
+  nexus-data:
+  sonarqube-data:
+  postgresql-data:
+  myendpoint-data:
+    
+services: 
+  nodeapp:
+    image: alypq/myendpoint:alison.parisaca
+    build: 
+      context: .
+      dockerfile: multistage.Dockerfile
+    ports:
+      - 3000:8080
+    networks:
+      - final-project-network
+    volumes: 
+      - myendpoint-data:/app
+    restart: always
+
+  sonar:
+    image: sonarqube:community
+    container_name: sonar
+    ports:
+      - 9000:9000
+    environment:
+      - "sonar.jdbc.url:jdbc:postgresql://postgres:5432/postgres"
+      - "sonar.jdbc.username:sonar"
+      - "sonar.jdbc.password:sonar"
+    depends_on:
+      - database
+    networks:
+      - final-project-network
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+    restart: always
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk11
+    container_name: jenkins
+    ports:
+      - 8080:8080
+      - 50000:50000
+    networks:
+      - final-project-network
+    volumes:
+      - jenkins-home:/var/jenkins-home
+    restart: always
+      
+  nexus:
+    image: sonatype/nexus3:3.31.1
+    container_name: nexus
+    ports:
+      - 8082:8082
+    depends_on:
+      - jenkins
+    networks:
+      - final-project-network
+    volumes:
+      - nexus-data:/nexus-data
+  
+  database:
+    image: postgres:12.7-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=sonar-db
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=secret
+    networks:
+      - final-project-network
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
